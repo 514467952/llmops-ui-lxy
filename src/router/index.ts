@@ -1,6 +1,7 @@
 import { createRouter, createWebHistory } from 'vue-router'
 import DefaultLayout from '@/views/layouts/DefaultLayout.vue'
 import BlankLayout from '@/views/layouts/BlankLayout.vue'
+import { isLogin } from '@/utils/auth.ts'
 
 const router = createRouter({
   history: createWebHistory(import.meta.env.BASE_URL),
@@ -10,6 +11,15 @@ const router = createRouter({
       path: '/',
       component: DefaultLayout,
       children: [
+        {
+          path: '',
+          redirect: 'home',
+        },
+        {
+          path: 'home',
+          name: 'page-home',
+          component: () => import('@/views/pages/HomeView.vue'),
+        },
         {
           path: 'space/apps',
           name: 'space-apps-list',
@@ -32,4 +42,11 @@ const router = createRouter({
   ],
 })
 
+router.beforeEach(async (to, from) => {
+  if (!isLogin() && to.name != 'auth-login') {
+    return { path: '/auth/Login' }
+  }
+  console.log(to)
+  console.log(from)
+})
 export default router
