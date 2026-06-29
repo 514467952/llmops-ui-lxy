@@ -1,40 +1,42 @@
-import { apiPrefix } from '@/config'
+import { Message } from '@arco-design/web-vue'
+import { apiPrefix, httpCode } from '@/config'
 
-// 超时时间100s
-const TIME_OUT = 10000
+// 1.超时时间为100s
+const TIME_OUT = 100000
 
-// Fetch请求参数类型
-type FetchOptionType = Omit<RequestInit, 'body'> & {
-  params?: Record<string, any>
-  body?: BodyInit | Record<string, any> | null
-}
-
-// Fetch请求基础配置
+// 2.基础的配置
 const baseFetchOptions = {
   method: 'GET',
   mode: 'cors',
-  credentials: 'include', // 每次都携带cookie、Http基础验证信息
+  credentials: 'include',
   headers: new Headers({
     'Content-Type': 'application/json',
   }),
   redirect: 'follow',
 }
 
-// 封装基础fetch函数
-const baseFetch = <T = any>(url: string, fetchOptions: FetchOptionType): Promise<T> => {
-  // 1.获取传递的所有配置
+// 3.fetch参数类型
+type FetchOptionType = Omit<RequestInit, 'body'> & {
+  params?: Record<string, any>
+  body?: BodyInit | Record<string, any> | null
+}
+
+// 4.封装基础的fetch请求
+const baseFetch = <T>(url: string, fetchOptions: FetchOptionType): Promise<T> => {
+  // 5.将所有的配置信息合并起来
   const options: typeof baseFetchOptions & FetchOptionType = Object.assign(
+    {},
     baseFetchOptions,
     fetchOptions,
   )
 
-  // 2.计算实际请求发起的URL地址
-  let urlWithPrefix = `${apiPrefix}${url}`
+  // 6.组装url
+  let urlWithPrefix = `${apiPrefix}${url.startsWith('/') ? url : `/${url}`}`
 
-  // 3.解构请求的method,params,body
+  // 7.解构出对应的请求方法、params、body参数
   const { method, params, body } = options
 
-  // 4.如果方法为GET并传递了参数，则处理参数信息
+  // 8.如果请求是GET方法，并且传递了params参数
   if (method === 'GET' && params) {
     const paramsArray: string[] = []
     Object.keys(params).forEach((key) => {
@@ -45,48 +47,52 @@ const baseFetch = <T = any>(url: string, fetchOptions: FetchOptionType): Promise
     } else {
       urlWithPrefix += `&${paramsArray.join('&')}`
     }
-    // 5.删除params参数
+
     delete options.params
   }
 
-  // 6.处理传递的post参数
+  // 9.处理post传递的数据
   if (body) {
     options.body = JSON.stringify(body)
   }
 
-  // 7.构建超时处理
+  // 10.同时发起两个Promise(或者是说两个操作，看谁先返回，就先结束)
   return Promise.race([
-    // 超时Promise
-    new Promise((_, reject) => {
+    // 11.使用定时器来检测是否超时
+    new Promise((resolve, reject) => {
       setTimeout(() => {
-        reject(new Error('请求超时'))
+        reject('接口已超时')
       }, TIME_OUT)
     }),
-    // 正常接口响应
+    // 12.发起一个正常请求
     new Promise((resolve, reject) => {
       globalThis
         .fetch(urlWithPrefix, options as RequestInit)
-        .then((res) => {
-          resolve(res.json())
+        .then(async (res) => {
+          const json = await res.json()
+          if (json.code === httpCode.success) {
+            resolve(json)
+          } else {
+            Message.error(json.message)
+            reject(new Error(json.message))
+          }
         })
         .catch((err) => {
+          Message.error(err.message)
           reject(err)
         })
     }),
   ]) as Promise<T>
 }
 
-// 封装基础的fetch请求
-export const request = <T = any>(url: string, options = {}) => {
+export const request = <T>(url: string, options = {}) => {
   return baseFetch<T>(url, options)
 }
 
-// 封装基础的get请求
-export const get = <T = any>(url: string, options = {}) => {
+export const get = <T>(url: string, options = {}) => {
   return request<T>(url, Object.assign({}, options, { method: 'GET' }))
 }
 
-// 封装基础的post请求
-export const post = <T = any>(url: string, options = {}) => {
+export const post = <T>(url: string, options = {}) => {
   return request<T>(url, Object.assign({}, options, { method: 'POST' }))
 }

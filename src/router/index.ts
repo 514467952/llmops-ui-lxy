@@ -39,6 +39,11 @@ const router = createRouter({
         },
       ],
     },
+    {
+      path: '/space/apps/:app_id',
+      name: 'space-apps-detail',
+      component: () => import('@/views/space/apps/DetailView.vue'),
+    },
   ],
 })
 
